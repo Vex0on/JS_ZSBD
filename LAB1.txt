@@ -1,0 +1,127 @@
+-- Zadanie 1 - Postawiłem bazę danych według schematu podanego w poleceniu
+CREATE TABLE REGIONS (
+    region_id INT PRIMARY KEY,
+    region_name VARCHAR(50)
+);
+
+CREATE TABLE COUNTRIES (
+    country_id CHAR(2) PRIMARY KEY,
+    country_name VARCHAR(50)
+);
+
+CREATE TABLE LOCATIONS (
+    location_id INT PRIMARY KEY,
+    street_address VARCHAR(100),
+    postal_code VARCHAR(20),
+    city VARCHAR(50),
+    state_province VARCHAR(50)
+);
+
+CREATE TABLE DEPARTMENTS (
+    department_id INT PRIMARY KEY,
+    department_name VARCHAR(50)
+);
+
+CREATE TABLE JOBS (
+    job_id VARCHAR(10) PRIMARY KEY,
+    job_title VARCHAR(50),
+    min_salary DECIMAL(10,2),
+    max_salary DECIMAL(10,2),
+    CHECK (max_salary - min_salary >= 2000)
+);
+
+CREATE TABLE EMPLOYEES (
+    employee_id INT PRIMARY KEY,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    email VARCHAR(100),
+    phone_number VARCHAR(20),
+    hire_date DATE,
+    salary DECIMAL(10,2),
+    commission_pct DECIMAL(5,2)
+);
+
+CREATE TABLE JOB_HISTORY (
+    employee_id INT,
+    start_date DATE,
+    end_date DATE,
+    PRIMARY KEY (employee_id, start_date)
+);
+
+ALTER TABLE COUNTRIES
+ADD region_id INT;
+ALTER TABLE COUNTRIES
+ADD CONSTRAINT fk_region FOREIGN KEY (region_id) REFERENCES REGIONS(region_id);
+
+ALTER TABLE LOCATIONS
+ADD country_id CHAR(2);
+ALTER TABLE LOCATIONS
+ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES COUNTRIES(country_id);
+
+ALTER TABLE DEPARTMENTS
+ADD manager_id INT;
+ALTER TABLE DEPARTMENTS
+ADD location_id INT;
+ALTER TABLE DEPARTMENTS
+ADD CONSTRAINT fk_location FOREIGN KEY (location_id) REFERENCES LOCATIONS(location_id);
+
+ALTER TABLE EMPLOYEES
+ADD job_id VARCHAR(10);
+ALTER TABLE EMPLOYEES
+ADD department_id INT;
+ALTER TABLE EMPLOYEES
+ADD manager_id INT;
+ALTER TABLE EMPLOYEES
+ADD CONSTRAINT fk_job FOREIGN KEY (job_id) REFERENCES JOBS(job_id);
+ALTER TABLE EMPLOYEES
+ADD CONSTRAINT fk_department FOREIGN KEY (department_id) REFERENCES DEPARTMENTS(department_id);
+ALTER TABLE EMPLOYEES
+ADD CONSTRAINT fk_manager FOREIGN KEY (manager_id) REFERENCES EMPLOYEES(employee_id);
+
+ALTER TABLE JOB_HISTORY
+ADD job_id VARCHAR(10);
+ALTER TABLE JOB_HISTORY
+ADD department_id INT;
+ALTER TABLE JOB_HISTORY
+ADD CONSTRAINT fk_job_history_job FOREIGN KEY (job_id) REFERENCES JOBS(job_id);
+ALTER TABLE JOB_HISTORY
+ADD CONSTRAINT fk_job_history_department FOREIGN KEY (department_id) REFERENCES DEPARTMENTS(department_id);
+ALTER TABLE JOB_HISTORY
+ADD CONSTRAINT fk_job_history_employee FOREIGN KEY (employee_id) REFERENCES EMPLOYEES(employee_id);
+
+-- Zadanie 2 - Dodałem 4 rekordy do tabeli JOBS
+INSERT INTO JOBS (job_id, job_title, min_salary, max_salary) VALUES ('J001', 'Analityk', 4000, 8000);
+INSERT INTO JOBS (job_id, job_title, min_salary, max_salary) VALUES ('J002', 'Programista', 5000, 9000);
+INSERT INTO JOBS (job_id, job_title, min_salary, max_salary) VALUES ('J003', 'Project Manager', 4500, 8500);
+INSERT INTO JOBS (job_id, job_title, min_salary, max_salary) VALUES ('J004', 'COO', 5500, 9500);
+
+-- Dodatkowo - uzupełnienie podstawowych rekordów
+INSERT INTO REGIONS (region_id, region_name) VALUES (1, 'Europe');
+INSERT INTO COUNTRIES (country_id, country_name, region_id) VALUES ('PL', 'Poland', 1);
+INSERT INTO LOCATIONS (location_id, street_address, postal_code, city, state_province, country_id) VALUES (1, 'Wiolesna', '00-001', 'Warszawa', 'Mazowieckie', 'PL');
+INSERT INTO DEPARTMENTS (department_id, department_name, manager_id, location_id) VALUES (1, 'IT', NULL, 1);
+INSERT INTO DEPARTMENTS (department_id, department_name, manager_id, location_id) VALUES (2, 'HR', NULL, 1);
+
+-- Zadanie 3 - Dodałem 4 rekordy do tabeli EMPLOYEES
+
+-- Zadanie 4 - Zmieniłem menadżerów
+UPDATE EMPLOYEES
+SET manager_id = 1
+WHERE employee_id IN (2, 3);
+
+-- Zadanie 5 - Zwiększyłem minimalne i maksymalne wynagrodzenia zgodnie z warunkami z polecenia
+UPDATE JOBS
+SET min_salary = min_salary + 500,
+    max_salary = max_salary + 500
+WHERE LOWER(job_title) LIKE '%b%' OR LOWER(job_title) LIKE '%s%';
+
+-- Zadanie 6 - Usunąłbym rekordy z większymi zarobkami, ale nie mam takich w bazie. Polecenie wyglądałoby tak
+
+DELETE FROM JOBS
+WHERE max_salary > 9000;
+
+-- Zadanie 7 - Usunąłem tabelę i ją przywróciłem
+
+DROP TABLE DEPARTMENTS CASCADE CONSTRAINTS;
+
+FLASHBACK TABLE DEPARTMENTS TO BEFORE DROP;
