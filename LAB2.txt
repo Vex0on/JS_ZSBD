@@ -73,4 +73,165 @@ SELECT first_name, last_name,
 FROM EMPLOYEES
 ORDER BY months_worked;
 
+-- Zadanie 5 - Płaca wyższa niż 5k
 
+CREATE VIEW dept_salaries AS
+SELECT d.department_id,
+       ROUND(SUM(e.salary)) AS suma_zarobkow,
+       ROUND(AVG(e.salary)) AS srednia_zarobkow
+FROM EMPLOYEES e
+JOIN DEPARTMENTS d ON e.department_id = d.department_id
+JOIN JOBS j ON e.job_id = j.job_id
+WHERE j.min_salary > 5000
+GROUP BY d.department_id;
+
+-- Zadanie 6 - Osoby pracujące z Toronoto
+
+CREATE VIEW emp_toronto AS
+SELECT e.last_name, e.department_id, d.department_name, e.job_id
+FROM EMPLOYEES e
+JOIN DEPARTMENTS d ON e.department_id = d.department_id
+JOIN LOCATIONS l ON d.location_id = l.location_id
+WHERE l.city = 'Toronto';
+
+-- Zadanie 7 - Osoby o imieniu Jennifer i ich współpracownicy
+
+CREATE VIEW jennifer_colleagues AS
+SELECT e1.first_name || ' ' || e1.last_name AS jennifer_name,
+       e2.first_name || ' ' || e2.last_name AS coworker_name
+FROM EMPLOYEES e1
+JOIN EMPLOYEES e2 ON e1.department_id = e2.department_id
+WHERE e1.first_name = 'Jennifer' AND e1.employee_id != e2.employee_id;
+
+-- Zadanie 8 - Departamenty bez pracowników
+
+CREATE VIEW empty_departments AS
+SELECT d.department_id, d.department_name
+FROM DEPARTMENTS d
+LEFT JOIN EMPLOYEES e ON d.department_id = e.department_id
+WHERE e.employee_id IS NULL;
+
+-- Zadanie 9 - Dane pracownicze
+
+CREATE VIEW emp_grades AS
+SELECT e.first_name, e.last_name, e.job_id, d.department_name, e.salary,
+       CASE 
+           WHEN salary < 3000 THEN 'D'
+           WHEN salary BETWEEN 3000 AND 5000 THEN 'C'
+           WHEN salary BETWEEN 5001 AND 8000 THEN 'B'
+           ELSE 'A'
+       END AS grade
+FROM EMPLOYEES e
+JOIN DEPARTMENTS d ON e.department_id = d.department_id;
+
+-- Zadanie 10 - Osoby zarabiające
+
+CREATE VIEW emp_above_avg AS
+SELECT first_name, last_name, salary
+FROM EMPLOYEES
+WHERE salary > (SELECT AVG(salary) FROM EMPLOYEES)
+ORDER BY salary DESC;
+
+-- Zadanie 11 - Osoby pracujące z osobami mającymi literę "U" w nazwisku
+
+CREATE VIEW emp_with_u_colleagues AS
+SELECT DISTINCT e.employee_id, e.first_name, e.last_name
+FROM EMPLOYEES e
+WHERE e.department_id IN (
+    SELECT DISTINCT department_id
+    FROM EMPLOYEES
+    WHERE LOWER(last_name) LIKE '%u%'
+);
+
+-- Zadanie 12 - Pracownicy pracujący dłużej niż średnia
+
+CREATE VIEW emp_above_avg_tenure AS
+SELECT employee_id, first_name, last_name, hire_date,
+       MONTHS_BETWEEN(SYSDATE, hire_date) AS months_worked
+FROM EMPLOYEES
+WHERE MONTHS_BETWEEN(SYSDATE, hire_date) > (
+    SELECT AVG(MONTHS_BETWEEN(SYSDATE, hire_date)) FROM EMPLOYEES
+);
+
+
+-- Zadanie 13 - Departamenty i informacje o nich
+
+CREATE VIEW dept_summary AS
+SELECT d.department_name,
+       COUNT(e.employee_id) AS liczba_pracownikow,
+       ROUND(AVG(e.salary)) AS srednie_wynagrodzenie
+FROM DEPARTMENTS d
+LEFT JOIN EMPLOYEES e ON d.department_id = e.department_id
+GROUP BY d.department_name
+ORDER BY liczba_pracownikow DESC;
+
+-- Zadanie 14 - Pracownicy zarabiający mniej niż ktokolwiek w "IT"
+
+CREATE VIEW emp_below_it AS
+SELECT first_name, last_name, salary
+FROM EMPLOYEES
+WHERE salary < (
+    SELECT MIN(e2.salary)
+    FROM EMPLOYEES e2
+    JOIN DEPARTMENTS d ON e2.department_id = d.department_id
+    WHERE d.department_name = 'IT'
+);
+
+-- Zadanie 15 - Departamenty, w których przynajmniej jeden pracownik zarabia więcej niż średnia
+
+CREATE VIEW dept_with_high_earner AS
+SELECT DISTINCT d.department_id, d.department_name
+FROM DEPARTMENTS d
+JOIN EMPLOYEES e ON d.department_id = e.department_id
+WHERE e.salary > (SELECT AVG(salary) FROM EMPLOYEES);
+
+-- Zadanie 16 - TOP5 najlepiej opłacanych stanowisk
+
+CREATE VIEW top5_jobs AS
+SELECT job_id, ROUND(AVG(salary)) AS avg_salary
+FROM EMPLOYEES
+GROUP BY job_id
+ORDER BY avg_salary DESC
+FETCH FIRST 5 ROWS ONLY;
+
+-- Zadanie 17 - Informacje o regionach
+
+CREATE VIEW region_summary AS
+SELECT r.region_name,
+       COUNT(DISTINCT c.country_id) AS liczba_krajow,
+       COUNT(e.employee_id) AS liczba_pracownikow
+FROM REGIONS r
+JOIN COUNTRIES c ON r.region_id = c.region_id
+JOIN LOCATIONS l ON c.country_id = l.country_id
+JOIN DEPARTMENTS d ON l.location_id = d.location_id
+JOIN EMPLOYEES e ON d.department_id = e.department_id
+GROUP BY r.region_name;
+
+-- Zadanie 18 - Pracownicy zarabiający więcej niż ich menedżerowie
+
+CREATE VIEW emp_earn_more_than_mgr AS
+SELECT e.first_name, e.last_name, e.salary,
+       m.first_name AS mgr_first, m.last_name AS mgr_last, m.salary AS mgr_salary
+FROM EMPLOYEES e
+JOIN EMPLOYEES m ON e.manager_id = m.employee_id
+WHERE e.salary > m.salary;
+
+-- Zadanie 19 - Ilość pracowników zaczynających pracę per miesiąc
+
+CREATE VIEW hires_by_month AS
+SELECT TO_CHAR(hire_date, 'MM') AS miesiac_nr,
+       TO_CHAR(hire_date, 'Month') AS miesiac,
+       COUNT(*) AS liczba_przyjec
+FROM EMPLOYEES
+GROUP BY TO_CHAR(hire_date, 'MM'), TO_CHAR(hire_date, 'Month')
+ORDER BY miesiac_nr;
+
+-- Zadanie 20 - Trzy departamenty z najwyższą średnią pensją
+
+CREATE VIEW top3_depts AS
+SELECT d.department_name, ROUND(AVG(e.salary)) AS srednia_pensja
+FROM DEPARTMENTS d
+JOIN EMPLOYEES e ON d.department_id = e.department_id
+GROUP BY d.department_name
+ORDER BY srednia_pensja DESC
+FETCH FIRST 3 ROWS ONLY;
