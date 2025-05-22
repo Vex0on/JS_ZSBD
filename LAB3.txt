@@ -1,0 +1,27 @@
+-- Zadanie 1 - Pracownicy zarabiający więcej niż 6000
+
+CREATE VIEW v_wysokie_pensje AS
+SELECT *
+FROM EMPLOYEES
+WHERE salary > 6000;
+
+-- Zadanie 2 - Aktualizacja z 6000 do 12 000
+
+CREATE OR REPLACE VIEW v_wysokie_pensje AS
+SELECT *
+FROM EMPLOYEES
+WHERE salary > 12000;
+
+-- Zadanie 3 - DROP widoku
+
+DROP VIEW v_wysokie_pensje;
+
+-- Zadanie 4 - Pracownicy z departamentu "Finance"
+
+CREATE VIEW v_finance_emps AS
+SELECT e.employee_id, e.last_name, e.first_name
+FROM EMPLOYEES e
+JOIN DEPARTMENTS d ON e.department_id = d.department_id
+WHERE d.department_name = 'Finance';
+
+-- Zadanie 5 - Pensje między 5k, a 12k
