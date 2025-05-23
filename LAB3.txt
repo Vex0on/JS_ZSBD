@@ -25,3 +25,93 @@ JOIN DEPARTMENTS d ON e.department_id = d.department_id
 WHERE d.department_name = 'Finance';
 
 -- Zadanie 5 - Pensje między 5k, a 12k
+
+CREATE VIEW v_mid_salary_employees AS
+SELECT employee_id, last_name, first_name, salary, job_id, email, hire_date
+FROM EMPLOYEES
+WHERE salary BETWEEN 5000 AND 12000;
+
+-- Zadanie 6 - Sprawdzenie operacji INSERT, UPDATE, DELETE na widoku z Zadania 5
+
+-- Insert
+
+INSERT INTO v_mid_salary_employees (
+    employee_id, last_name, first_name, salary, job_id, email, hire_date
+) VALUES (
+    999, 'Nowak', 'Tomasz', 7000, 'IT_PROG', 'tomasz.nowak@example.com', TO_DATE('2023-01-15', 'YYYY-MM-DD')
+);
+
+-- Nie można, wyrzuca błąd (ORA-01779: cannot modify a column which maps to a non key-preserved table)
+-- Update
+
+UPDATE v_mid_salary_employees
+SET salary = 8000
+WHERE employee_id = 103;
+
+-- Można o ile wartość mieści się w tym zakresie 5k - 12k
+-- Delete
+
+DELETE FROM v_mid_salary_employees
+WHERE employee_id = 103;
+
+-- Można
+
+-- Zadanie 7 - Działy zatrudniające przynajmniej 4 pracowników
+
+CREATE VIEW v_dept_summary_stats AS
+SELECT e.department_id,
+       d.department_name,
+       COUNT(*) AS employee_count,
+       ROUND(AVG(e.salary)) AS avg_salary,
+       MAX(e.salary) AS max_salary
+FROM EMPLOYEES e
+JOIN DEPARTMENTS d ON e.department_id = d.department_id
+GROUP BY e.department_id, d.department_name
+HAVING COUNT(*) >= 4;
+
+-- Zadanie 8 - Widok z Zadania 5, ale z WITH CHECK OPTION
+
+CREATE OR REPLACE VIEW v_mid_salary_employees_check AS
+SELECT employee_id, last_name, first_name, salary, job_id, email, hire_date
+FROM EMPLOYEES
+WHERE salary BETWEEN 5000 AND 12000
+WITH CHECK OPTION;
+
+-- Sprawdzenie
+
+INSERT INTO v_mid_salary_employees_check (
+    employee_id, last_name, first_name, salary, job_id, email, hire_date
+) VALUES (
+    999, 'Nowak', 'Piotr', 7000, 'IT_PROG', 'pnowak@example.com', SYSDATE
+);
+
+-- Działa
+
+INSERT INTO v_mid_salary_employees_check (
+    employee_id, last_name, first_name, salary, job_id, email, hire_date
+) VALUES (
+    1000, 'Kowalski', 'Adam', 13000, 'IT_PROG', 'akowalski@example.com', SYSDATE
+);
+
+-- Nie działa ze względu na WITH CHECK OPTION
+
+-- Zadanie 9 - Widok zmaterializowany menadżerów i nazw ich działów
+
+CREATE MATERIALIZED VIEW v_managers
+BUILD IMMEDIATE
+REFRESH ON DEMAND
+AS
+SELECT DISTINCT e.employee_id, e.first_name, e.last_name, d.department_name
+FROM EMPLOYEES e
+JOIN DEPARTMENTS d ON e.employee_id = d.manager_id;
+
+-- Zadanie 10 - TOP10 najlepiej opłacanych pracowników
+
+CREATE VIEW v_top_paid AS
+SELECT employee_id, first_name, last_name, salary, job_id
+FROM (
+    SELECT employee_id, first_name, last_name, salary, job_id,
+           RANK() OVER (ORDER BY salary DESC) AS rank
+    FROM EMPLOYEES
+)
+WHERE rank <= 10;
