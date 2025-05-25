@@ -1,104 +1,207 @@
 -- Zadanie 1 - Ranking pracowników wg pensji
 
+CREATE VIEW salary_rank AS
 SELECT employee_id, first_name, last_name, salary,
        RANK() OVER (ORDER BY salary DESC) AS salary_rank
 FROM employees;
 
-
 -- Zadanie 2 - Dodanie kolumny z całkowitą sumą pensji
 
-SELECT employee_id, first_name, last_name, salary,
-       SUM(salary) OVER () AS total_salary
+CREATE OR REPLACE VIEW salary_rank AS
+SELECT
+    employee_id,
+    first_name,
+    last_name,
+    salary,
+    RANK() OVER (ORDER BY salary DESC) AS salary_rank,
+    SUM(salary) OVER () AS total_salary
 FROM employees;
-
 
 -- Zadanie 3 - Skumolowane wartości sprzedaży i rankingu pracowniczego
 
-SELECT e.last_name, p.product_name,
-       SUM(s.price * s.quantity) AS employee_total_sales,
-       RANK() OVER (ORDER BY SUM(s.price * s.quantity) DESC) AS sales_rank
-FROM sales s
-JOIN employees e ON s.employee_id = e.employee_id
-JOIN products p ON s.product_id = p.product_id
-GROUP BY e.last_name, p.product_name;
+-- W takim wypadku najpierw tworzymy brakujące tabele:
+
+CREATE TABLE PRODUCTS AS SELECT * FROM HR.PRODUCTS
+CREATE TABLE SALES AS SELECT * FROM HR.SALES
+
+WITH sales_per_employee AS (
+  SELECT
+    s.employee_id,
+    e.last_name,
+    s.product_id,
+    SUM(s.quantity * s.price) AS total_sales_per_product
+  FROM sales s
+  JOIN employees e ON s.employee_id = e.employee_id
+  GROUP BY s.employee_id, e.last_name, s.product_id
+),
+
+sales_per_employee_total AS (
+  SELECT
+    employee_id,
+    last_name,
+    SUM(total_sales_per_product) AS cumulative_sales
+  FROM sales_per_employee
+  GROUP BY employee_id, last_name
+),
+
+ranked_employees AS (
+  SELECT
+    employee_id,
+    last_name,
+    cumulative_sales,
+    RANK() OVER (ORDER BY cumulative_sales DESC) AS sales_rank
+  FROM sales_per_employee_total
+)
+
+SELECT
+  r.last_name,
+  p.product_name,
+  sp.total_sales_per_product,
+  r.cumulative_sales,
+  r.sales_rank
+FROM ranked_employees r
+JOIN sales_per_employee sp ON r.employee_id = sp.employee_id
+JOIN products p ON sp.product_id = p.product_id
+ORDER BY r.sales_rank, r.last_name, p.product_name;
 
 
 -- Zadanie 4 - Szczegóły sprzedaży z poprzednią i następną ceną
 
-SELECT e.last_name, p.product_name, s.price,
-       COUNT(*) OVER (PARTITION BY s.product_id, s.sale_date) AS transactions_count,
-       SUM(s.price * s.quantity) OVER (PARTITION BY s.product_id, s.sale_date) AS total_paid,
-       LAG(s.price) OVER (PARTITION BY s.product_id ORDER BY s.sale_date) AS previous_price,
-       LEAD(s.price) OVER (PARTITION BY s.product_id ORDER BY s.sale_date) AS next_price
+SELECT
+  e.last_name,
+  p.product_name,
+  s.price,
+  COUNT(*) OVER (PARTITION BY s.product_id, TRUNC(s.sale_date)) AS transactions_count,
+  SUM(s.quantity * s.price) OVER (PARTITION BY s.product_id, TRUNC(s.sale_date)) AS total_amount_per_day,
+  LAG(s.price) OVER (PARTITION BY s.product_id ORDER BY s.sale_date, s.sale_id) AS previous_price,
+  LEAD(s.price) OVER (PARTITION BY s.product_id ORDER BY s.sale_date, s.sale_id) AS next_price,
+  s.sale_date,
+  s.quantity
 FROM sales s
 JOIN employees e ON s.employee_id = e.employee_id
-JOIN products p ON s.product_id = p.product_id;
+JOIN products p ON s.product_id = p.product_id
+ORDER BY s.sale_date, e.last_name, p.product_name;
 
 
 -- Zadanie 5 - Wypisanie danych z polecenia
 
-SELECT p.product_name, s.price,
-       SUM(s.price * s.quantity) OVER (PARTITION BY p.product_id, TO_CHAR(s.sale_date, 'YYYY-MM')) AS monthly_sum,
-       SUM(s.price * s.quantity) OVER (PARTITION BY p.product_id, TO_CHAR(s.sale_date, 'YYYY-MM') ORDER BY s.sale_date) AS monthly_running_sum
+SELECT
+  p.product_name,
+  s.price,
+  TRUNC(s.sale_date, 'MM') AS sale_month,
+  SUM(s.quantity * s.price) OVER (PARTITION BY s.product_id, TRUNC(s.sale_date, 'MM')) AS total_month_amount,
+  SUM(s.quantity * s.price) OVER (
+    PARTITION BY s.product_id, TRUNC(s.sale_date, 'MM')
+    ORDER BY s.sale_date, s.sale_id
+    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+  ) AS running_total
 FROM sales s
-JOIN products p ON s.product_id = p.product_id;
+JOIN products p ON s.product_id = p.product_id
+ORDER BY p.product_name, sale_month, s.sale_date, s.sale_id;
+
 
 
 -- Zadanie 6 - Porównanie ceny produktu 2022 vs 2023
 
-SELECT p.product_name, c.category_name,
-       s2022.price AS price_2022,
-       s2023.price AS price_2023,
-       s2023.price - s2022.price AS price_difference
-FROM products p
-JOIN categories c ON p.category_id = c.category_id
-JOIN sales s2022 ON s2022.product_id = p.product_id AND EXTRACT(YEAR FROM s2022.sale_date) = 2022
-JOIN sales s2023 ON s2023.product_id = p.product_id AND EXTRACT(YEAR FROM s2023.sale_date) = 2023
-                 AND TO_CHAR(s2022.sale_date, 'MM-DD') = TO_CHAR(s2023.sale_date, 'MM-DD');
+WITH sales_2022 AS (
+  SELECT product_id, TO_CHAR(sale_date, 'MM-DD') AS month_day, price
+  FROM sales
+  WHERE TO_NUMBER(TO_CHAR(sale_date, 'YY')) + 2000 = 2022
+),
+sales_2023 AS (
+  SELECT product_id, TO_CHAR(sale_date, 'MM-DD') AS month_day, price
+  FROM sales
+  WHERE TO_NUMBER(TO_CHAR(sale_date, 'YY')) + 2000 = 2023
+)
+SELECT
+  p.product_name,
+  p.product_category,
+  s22.price AS price_2022,
+  s23.price AS price_2023,
+  (s23.price - s22.price) AS price_diff,
+  s22.month_day
+FROM sales_2022 s22
+FULL OUTER JOIN sales_2023 s23
+  ON s22.product_id = s23.product_id
+  AND s22.month_day = s23.month_day
+JOIN products p ON p.product_id = COALESCE(s22.product_id, s23.product_id)
+ORDER BY p.product_name, s22.month_day;
 
 
 -- Zadanie 7 - Min, max, różnica cen produktów w kategoriach
 
-SELECT c.category_name, p.product_name, s.price,
-       MIN(s.price) OVER (PARTITION BY c.category_id) AS min_price,
-       MAX(s.price) OVER (PARTITION BY c.category_id) AS max_price,
-       MAX(s.price) OVER (PARTITION BY c.category_id) - MIN(s.price) OVER (PARTITION BY c.category_id) AS price_diff
+SELECT
+  p.product_category,
+  p.product_name,
+  s.price,
+  MIN(s.price) OVER (PARTITION BY p.product_category) AS min_price_in_category,
+  MAX(s.price) OVER (PARTITION BY p.product_category) AS max_price_in_category,
+  MAX(s.price) OVER (PARTITION BY p.product_category) - MIN(s.price) OVER (PARTITION BY p.product_category) AS price_diff
 FROM sales s
 JOIN products p ON s.product_id = p.product_id
-JOIN categories c ON p.category_id = c.category_id;
+ORDER BY p.product_category, p.product_name, s.sale_date;
 
--- Zadanie 8 - Średnia krocząca z cen produktów
+-- Zadanie 8 - Nazwa produktu i średnia krocząca ceny
 
-SELECT p.product_name, s.sale_date, s.price,
-       ROUND(AVG(s.price) OVER (
-           PARTITION BY s.product_id
-           ORDER BY s.sale_date
-           ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
-       ), 2) AS moving_avg_price
-FROM sales s
-JOIN products p ON s.product_id = p.product_id;
+WITH price_with_neighbors AS (
+  SELECT
+    s.product_id,
+    p.product_name,
+    s.sale_date,
+    s.price,
+    LAG(s.price) OVER (PARTITION BY s.product_id ORDER BY s.sale_date) AS prev_price,
+    LEAD(s.price) OVER (PARTITION BY s.product_id ORDER BY s.sale_date) AS next_price
+  FROM sales s
+  JOIN products p ON s.product_id = p.product_id
+)
+SELECT
+  product_name,
+  sale_date,
+  price,
+  ROUND(
+    COALESCE((prev_price + price + next_price) / 
+      (CASE WHEN prev_price IS NOT NULL THEN 1 ELSE 0 END +
+       1 +
+       CASE WHEN next_price IS NOT NULL THEN 1 ELSE 0 END), price)
+  , 2) AS moving_avg_price
+FROM price_with_neighbors
+ORDER BY product_name, sale_date;
+
 
 -- Zadanie 9 - Ranking, numeracja i ranking gęsty
 
-SELECT c.category_name, p.product_name, s.price,
-       RANK() OVER (PARTITION BY c.category_id ORDER BY s.price DESC) AS price_rank,
-       ROW_NUMBER() OVER (PARTITION BY c.category_id ORDER BY s.price DESC) AS row_number,
-       DENSE_RANK() OVER (PARTITION BY c.category_id ORDER BY s.price DESC) AS dense_rank
+SELECT
+  p.product_name,
+  p.product_category,
+  s.price,
+  RANK() OVER (PARTITION BY p.product_category ORDER BY s.price) AS price_rank,
+  ROW_NUMBER() OVER (PARTITION BY p.product_category ORDER BY s.price) AS row_num,
+  DENSE_RANK() OVER (PARTITION BY p.product_category ORDER BY s.price) AS dense_price_rank
 FROM sales s
 JOIN products p ON s.product_id = p.product_id
-JOIN categories c ON p.category_id = c.category_id;
+ORDER BY p.product_category, s.price;
+
 
 -- Zadanie 10 - Wartość rosnąca sprzedaży i ranking globalny
 
-SELECT e.last_name, p.product_name,
-       SUM(s.price * s.quantity) OVER (PARTITION BY s.employee_id ORDER BY s.sale_date) AS cumulative_sales,
-       RANK() OVER (ORDER BY s.price * s.quantity DESC) AS global_sales_rank
+SELECT
+  e.last_name,
+  p.product_name,
+  s.sale_date,
+  SUM(s.price * s.quantity) OVER (PARTITION BY e.employee_id ORDER BY s.sale_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total_sales,
+  RANK() OVER (ORDER BY s.price * s.quantity DESC) AS global_sales_rank
 FROM sales s
 JOIN employees e ON s.employee_id = e.employee_id
-JOIN products p ON s.product_id = p.product_id;
+JOIN products p ON s.product_id = p.product_id
+ORDER BY e.employee_id, s.sale_date;
+
 
 -- Zadanie 11 - Pracownicy biorący udział w sprzedaży
 
-SELECT DISTINCT e.first_name, e.last_name, e.job_id
+SELECT DISTINCT
+  e.first_name,
+  e.last_name,
+  j.job_title
 FROM employees e
-JOIN sales s ON e.employee_id = s.employee_id;
+JOIN sales s ON e.employee_id = s.employee_id
+JOIN jobs j ON e.job_id = j.job_id;
