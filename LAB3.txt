@@ -41,12 +41,12 @@ INSERT INTO v_mid_salary_employees (
     999, 'Nowak', 'Tomasz', 7000, 'IT_PROG', 'tomasz.nowak@example.com', TO_DATE('2023-01-15', 'YYYY-MM-DD')
 );
 
--- Nie można, wyrzuca błąd (ORA-01779: cannot modify a column which maps to a non key-preserved table)
+-- Można - 1 row inserted. (Tylko wartość musi być pomiędzy 5 - 12k)
 -- Update
 
 UPDATE v_mid_salary_employees
 SET salary = 8000
-WHERE employee_id = 103;
+WHERE employee_id = 999;
 
 -- Można o ile wartość mieści się w tym zakresie 5k - 12k
 -- Delete
@@ -107,11 +107,25 @@ JOIN DEPARTMENTS d ON e.employee_id = d.manager_id;
 
 -- Zadanie 10 - TOP10 najlepiej opłacanych pracowników
 
-CREATE VIEW v_top_paid AS
-SELECT employee_id, first_name, last_name, salary, job_id
+CREATE OR REPLACE VIEW v_top_paid AS
+SELECT
+    e.employee_id,
+    e.first_name,
+    e.last_name,
+    e.salary,
+    e.job_id,
+    j.job_title,
+    rnk
 FROM (
-    SELECT employee_id, first_name, last_name, salary, job_id,
-           RANK() OVER (ORDER BY salary DESC) AS rank
+    SELECT
+        employee_id,
+        first_name,
+        last_name,
+        salary,
+        job_id,
+        RANK() OVER (ORDER BY salary DESC) AS rnk
     FROM EMPLOYEES
-)
-WHERE rank <= 10;
+) e
+JOIN JOBS j ON e.job_id = j.job_id
+WHERE rnk <= 10;
+
