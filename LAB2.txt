@@ -54,11 +54,13 @@ ORDER BY job_id;
 
 -- Zadanie 3 - Widok danych osobowych i zarobków
 
-CREATE VIEW emp_names AS
-SELECT first_name || ' ' || last_name AS full_name, salary, phone_number
-FROM EMPLOYEES
-WHERE SUBSTR(last_name, 3, 1) = 'e' AND first_name LIKE '%' || employee_id || '%'
-ORDER BY full_name DESC, salary ASC;
+CREATE OR REPLACE VIEW emp_names AS
+SELECT
+    first_name || ' ' || last_name AS full_name,
+    salary,
+    phone_number
+FROM employees
+WHERE SUBSTR(last_name, 3, 1) = 'e';
 
 -- Zadanie 4 - Widok dodatków
 
@@ -187,12 +189,21 @@ WHERE e.salary > (SELECT AVG(salary) FROM EMPLOYEES);
 
 -- Zadanie 16 - TOP5 najlepiej opłacanych stanowisk
 
-CREATE VIEW top5_jobs AS
-SELECT job_id, ROUND(AVG(salary)) AS avg_salary
-FROM EMPLOYEES
-GROUP BY job_id
-ORDER BY avg_salary DESC
+CREATE OR REPLACE VIEW top5_jobs AS
+SELECT
+    j.job_title,
+    e.job_id,
+    ROUND(AVG(e.salary)) AS avg_salary
+FROM
+    employees e
+JOIN
+    jobs j ON e.job_id = j.job_id
+GROUP BY
+    j.job_title, e.job_id
+ORDER BY
+    avg_salary DESC
 FETCH FIRST 5 ROWS ONLY;
+
 
 -- Zadanie 17 - Informacje o regionach
 
